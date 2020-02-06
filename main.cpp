@@ -19,13 +19,13 @@ int landscape_max = 10; // must always be even!
 // random number generator
 std::mt19937_64 rng;
 std::uniform_int_distribution<int> position_distribution_int(0, landscape_max-1);
-std::uniform_real_distribution<double> dispersal_distribution_float(0.0, static_cast<double>(landscape_max/2));
+std::uniform_int_distribution<int> dispersal_kernel_picker(0, landscape_max/2);
 
 // agent class
 class agent
 {
 public:
-    double p_dispersal = dispersal_distribution_float(rng);
+    int p_dispersal = dispersal_kernel_picker(rng);
     int position = position_distribution_int(rng);
     double intake = 0.0001;
 
@@ -33,38 +33,42 @@ public:
     void do_get_fitness();
 };
 
+/// wrapper function
+int wrapper(int distance, int current_val, int max_val) {
+
+    int new_pos = (max_val + current_val + distance) % max_val;
+    return new_pos;
+}
+
 std::vector<agent> population(popsize);
 
-// gridcell class
-class gridcell
+// patch class
+class patch
 {
 public:
     int colonisers = 0;
 };
 
-std::vector<gridcell> landscape(landscape_max);
+std::vector<patch> landscape(landscape_max);
 
 void agent::do_disperse(){
 
-    int old_pos = position;
+    // pick a dispersal distance from 0 to the max individual specific value
+    std::uniform_int_distribution<int> ind_disp_kernel(0, p_dispersal);
+    int d_dispersal = ind_disp_kernel(rng);
 
-    double temp_pos = static_cast<double>(position) + p_dispersal;
-
-    temp_pos = fmod(temp_pos, static_cast<double>(landscape_max));
-
-    position = static_cast<int>(temp_pos);
-
+    position = wrapper(d_dispersal, position, landscape_max);
     assert(position <= (landscape_max-1) &&
            "do_disperse: agent walked over landscape\n");
 }
 
 void count_colonisers(){
-    for(int land = 0; land < landscape_max; land++){
+    for(size_t land = 0; land < static_cast<size_t>(landscape_max); land++){
         // reset initial value
         landscape[land].colonisers = 0;
 
-        for (int ind3 = 0;ind3 < popsize;ind3++) {
-            if(static_cast<int>(population[ind3].position == land)){
+        for (size_t ind3 = 0; ind3 < static_cast<size_t>(popsize);ind3++) {
+            if(static_cast<int>(population[ind3].position == static_cast<int>(land))){
                 landscape[land].colonisers += 1;
             }
         }
@@ -74,7 +78,7 @@ void count_colonisers(){
 }
 
 void agent::do_get_fitness(){
-    int neighbours = landscape[position].colonisers;
+    int neighbours = landscape[static_cast<size_t>(position)].colonisers;
     intake += ((neighbours == 0) ? (1.0) : (1.0/(static_cast<double>(neighbours))));
 }
 
